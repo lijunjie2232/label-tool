@@ -14,7 +14,7 @@ function App() {
   const [currentView, setCurrentView] = useState('dataset');
   const [currentDataset, setCurrentDataset] = useState(null);
   const [datasetConfig, setDatasetConfig] = useState(null);
-  const [selectedImagePath, setSelectedImagePath] = useState(null);
+  const [annotationStartImage, setAnnotationStartImage] = useState(null);
 
   const handleDatasetSelect = (dataset, config, editMode = false) => {
     setCurrentDataset(dataset);
@@ -36,7 +36,7 @@ function App() {
             dataset={currentDataset}
             config={datasetConfig}
             onAnnotateClick={(imagePath) => {
-              setSelectedImagePath(imagePath);
+              setAnnotationStartImage(imagePath);
               setCurrentView('annotate');
             }}
           />
@@ -46,9 +46,9 @@ function App() {
           <AnnotationView
             dataset={currentDataset}
             config={datasetConfig}
-            initialImagePath={selectedImagePath}
+            initialImagePath={annotationStartImage}
             onBack={() => {
-              setSelectedImagePath(null);
+              setAnnotationStartImage(null);
               setCurrentView('images');
             }}
           />

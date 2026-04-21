@@ -187,8 +187,8 @@ function ImageList({ dataset, config, onAnnotateClick }) {
       dataIndex: 'absolute_path',
       key: 'preview',
       width: 120,
-      render: (path) => (
-        <ImagePreview path={path} onAnnotateClick={() => onAnnotateClick(path)} />
+      render: (_, record) => (
+        <ImagePreview path={record.absolute_path} onAnnotateClick={() => onAnnotateClick(record.relative_path)} />
       ),
     },
     {
