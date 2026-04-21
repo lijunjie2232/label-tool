@@ -4,7 +4,7 @@ import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import ImageViewer from './ImageViewer';
 import { imageAPI, annotationAPI } from '../services/api';
 
-function AnnotationView({ dataset, config, onBack }) {
+function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   const [images, setImages] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(null);
@@ -15,7 +15,7 @@ function AnnotationView({ dataset, config, onBack }) {
     if (dataset) {
       loadImages();
     }
-  }, [dataset, sortBy]);
+  }, [dataset, sortBy, initialImagePath]);
 
   useEffect(() => {
     if (images.length > 0 && currentIndex < images.length) {
@@ -92,8 +92,20 @@ function AnnotationView({ dataset, config, onBack }) {
         annotated_on_top: 'not_set',
         recursive: true
       });
-      setImages(response.data.images || []);
-      setCurrentIndex(0);
+      const loadedImages = response.data.images || [];
+      setImages(loadedImages);
+      
+      // If an initial image path is provided, find its index
+      if (initialImagePath && loadedImages.length > 0) {
+        const initialIndex = loadedImages.findIndex(img => img.relative_path === initialImagePath);
+        if (initialIndex !== -1) {
+          setCurrentIndex(initialIndex);
+        } else {
+          setCurrentIndex(0);
+        }
+      } else {
+        setCurrentIndex(0);
+      }
     } catch (error) {
       message.error('Failed to load images');
     }
