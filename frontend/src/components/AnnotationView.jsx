@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button, InputNumber, Space, message, Select, Switch } from 'antd';
-import { LeftOutlined, RightOutlined } from '@ant-design/icons';
+import { LeftOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons';
 import ImageViewer from './ImageViewer';
 import { imageAPI, annotationAPI } from '../services/api';
 
@@ -191,6 +191,38 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
     }
   };
 
+  const handleRefresh = async () => {
+    try {
+      message.loading('Refreshing image...', 0);
+      
+      // Clear the current image blob URL
+      if (currentImage && imageBlobUrls[currentImage.absolute_path]) {
+        URL.revokeObjectURL(imageBlobUrls[currentImage.absolute_path]);
+        setImageBlobUrls(prev => {
+          const updated = { ...prev };
+          delete updated[currentImage.absolute_path];
+          return updated;
+        });
+      }
+      
+      // Reload the current image
+      const response = await imageAPI.getPreview(currentImage.absolute_path);
+      const url = URL.createObjectURL(response.data);
+      
+      setImageBlobUrls(prev => ({
+        ...prev,
+        [currentImage.absolute_path]: url
+      }));
+      
+      message.destroy();
+      message.success('Image refreshed');
+    } catch (error) {
+      message.destroy();
+      message.error('Failed to refresh image');
+      console.error('Failed to refresh image:', error);
+    }
+  };
+
   const handlePrevious = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
@@ -367,6 +399,9 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
           </Button>
           <Button icon={<RightOutlined />} onClick={handleNext}>
             Next (↓)
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
+            Refresh Image
           </Button>
         </Space>
 
