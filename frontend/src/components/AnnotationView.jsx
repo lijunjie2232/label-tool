@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, InputNumber, Space, message, Select } from 'antd';
+import { Button, InputNumber, Space, message, Select, Switch } from 'antd';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import ImageViewer from './ImageViewer';
 import { imageAPI, annotationAPI } from '../services/api';
 
 function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   const [images, setImages] = useState([]);
+  const [filteredImages, setFilteredImages] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(null);
   const [sortBy, setSortBy] = useState('file_name');
+  const [hideAnnotated, setHideAnnotated] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -18,8 +20,24 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   }, [dataset, sortBy, initialImagePath]);
 
   useEffect(() => {
-    if (images.length > 0 && currentIndex < images.length) {
-      setScore(images[currentIndex].score);
+    // Filter images based on hideAnnotated setting
+    if (hideAnnotated) {
+      const filtered = images.filter(img => !img.is_annotated);
+      setFilteredImages(filtered);
+      // Adjust current index if needed
+      if (currentIndex >= filtered.length && filtered.length > 0) {
+        setCurrentIndex(filtered.length - 1);
+      } else if (filtered.length === 0) {
+        setCurrentIndex(0);
+      }
+    } else {
+      setFilteredImages(images);
+    }
+  }, [images, hideAnnotated]);
+
+  useEffect(() => {
+    if (filteredImages.length > 0 && currentIndex < filteredImages.length) {
+      setScore(filteredImages[currentIndex].score);
       // 自动聚焦到输入框
       setTimeout(() => {
         if (inputRef.current) {
@@ -27,7 +45,7 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
         }
       }, 100);
     }
-  }, [currentIndex, images]);
+  }, [currentIndex, filteredImages]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -96,15 +114,28 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
       setImages(loadedImages);
       
       // If an initial image path is provided, find its index
+      let targetIndex = 0;
       if (initialImagePath && loadedImages.length > 0) {
         const initialIndex = loadedImages.findIndex(img => img.relative_path === initialImagePath);
         if (initialIndex !== -1) {
-          setCurrentIndex(initialIndex);
+          targetIndex = initialIndex;
+        }
+      }
+      
+      // Apply filtering after loading
+      if (hideAnnotated) {
+        const filtered = loadedImages.filter(img => !img.is_annotated);
+        setFilteredImages(filtered);
+        // Find the target image in filtered list
+        if (initialImagePath && filtered.length > 0) {
+          const filteredIndex = filtered.findIndex(img => img.relative_path === initialImagePath);
+          setCurrentIndex(filteredIndex !== -1 ? filteredIndex : 0);
         } else {
           setCurrentIndex(0);
         }
       } else {
-        setCurrentIndex(0);
+        setFilteredImages(loadedImages);
+        setCurrentIndex(targetIndex);
       }
     } catch (error) {
       message.error('Failed to load images');
@@ -127,11 +158,34 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
 
     try {
       await annotationAPI.add(dataset, {
-        image_path: images[currentIndex].relative_path,
+        image_path: filteredImages[currentIndex].relative_path,
         score: score
       });
       message.success('Annotation saved');
-      handleNext();
+      
+      // If hiding annotated images, we need to reload or refilter
+      if (hideAnnotated) {
+        // Update the current image's annotation status
+        const updatedImages = images.map(img => 
+          img.relative_path === filteredImages[currentIndex].relative_path 
+            ? { ...img, is_annotated: true, score: score }
+            : img
+        );
+        setImages(updatedImages);
+        
+        // Remove current image from filtered list and move to next
+        const newFiltered = updatedImages.filter(img => !img.is_annotated);
+        setFilteredImages(newFiltered);
+        
+        // Stay at same index (which is now the next unannotated image)
+        if (newFiltered.length === 0) {
+          message.info('All images have been annotated!');
+        } else if (currentIndex >= newFiltered.length) {
+          setCurrentIndex(Math.max(0, newFiltered.length - 1));
+        }
+      } else {
+        handleNext();
+      }
     } catch (error) {
       message.error('Failed to save annotation');
     }
@@ -146,7 +200,7 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   };
 
   const handleNext = () => {
-    if (currentIndex < images.length - 1) {
+    if (currentIndex < filteredImages.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
       message.info('Already at last image');
@@ -205,19 +259,19 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   const [imageBlobUrls, setImageBlobUrls] = useState({});
 
   useEffect(() => {
-    if (images.length === 0) return;
+    if (filteredImages.length === 0) return;
 
     // 确定需要加载的图片索引：当前、前一张、后一张
     const indicesToLoad = new Set();
     indicesToLoad.add(currentIndex);
     if (currentIndex > 0) indicesToLoad.add(currentIndex - 1);
-    if (currentIndex < images.length - 1) indicesToLoad.add(currentIndex + 1);
+    if (currentIndex < filteredImages.length - 1) indicesToLoad.add(currentIndex + 1);
 
     // 过滤出尚未加载的图片
     const imagesToLoad = [];
     indicesToLoad.forEach(index => {
-      if (!imageBlobUrls[images[index].absolute_path]) {
-        imagesToLoad.push({ index, image: images[index] });
+      if (!imageBlobUrls[filteredImages[index].absolute_path]) {
+        imagesToLoad.push({ index, image: filteredImages[index] });
       }
     });
 
@@ -251,8 +305,8 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
     return () => {
       // 清理不在视野范围内的图片 URL
       const visiblePaths = new Set();
-      for (let i = Math.max(0, currentIndex - 1); i <= Math.min(images.length - 1, currentIndex + 1); i++) {
-        visiblePaths.add(images[i].absolute_path);
+      for (let i = Math.max(0, currentIndex - 1); i <= Math.min(filteredImages.length - 1, currentIndex + 1); i++) {
+        visiblePaths.add(filteredImages[i].absolute_path);
       }
       
       Object.keys(imageBlobUrls).forEach(path => {
@@ -262,13 +316,13 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
         }
       });
     };
-  }, [currentIndex, images]);
+  }, [currentIndex, filteredImages]);
 
-  if (images.length === 0) {
-    return <div>No images to annotate</div>;
+  if (filteredImages.length === 0) {
+    return <div>{hideAnnotated ? 'No unannotated images available' : 'No images to annotate'}</div>;
   }
 
-  const currentImage = images[currentIndex];
+  const currentImage = filteredImages[currentIndex];
   const imageUrl = currentImage ? (imageBlobUrls[currentImage.absolute_path] || '') : '';
 
   return (
@@ -283,7 +337,8 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
         <div>
           <h3>Current Image</h3>
           <p style={{ fontSize: 12, wordBreak: 'break-all' }}>{currentImage.relative_path}</p>
-          <p>Progress: {currentIndex + 1} / {images.length}</p>
+          <p>Progress: {currentIndex + 1} / {filteredImages.length} {hideAnnotated && '(unannotated only)'}</p>
+          {hideAnnotated && <p style={{ fontSize: 12, color: '#999' }}>Total images: {images.length}, Annotated: {images.filter(img => img.is_annotated).length}</p>}
         </div>
 
         <div>
@@ -329,6 +384,14 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
                 <Select.Option value="file_name">File Name</Select.Option>
                 <Select.Option value="random">Random</Select.Option>
               </Select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>Hide annotated:</span>
+              <Switch 
+                checked={hideAnnotated} 
+                onChange={setHideAnnotated}
+                size="small"
+              />
             </div>
           </Space>
         </div>
