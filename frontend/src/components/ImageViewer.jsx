@@ -1,58 +1,87 @@
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { Button, Space } from 'antd';
-import { ZoomInOutlined, ZoomOutOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useEffect, useRef } from 'react';
+import Viewer from 'viewerjs';
+import 'viewerjs/dist/viewer.css';
 
 function ImageViewer({ imageUrl }) {
+  const imageRef = useRef(null);
+  const viewerRef = useRef(null);
+
+  useEffect(() => {
+    if (imageRef.current && imageUrl) {
+      // Destroy existing viewer if it exists
+      if (viewerRef.current) {
+        viewerRef.current.destroy();
+      }
+
+      // Create new Viewer instance in modal mode
+      viewerRef.current = new Viewer(imageRef.current, {
+        inline: false,
+        button: true,
+        navbar: true,
+        title: true,
+        toolbar: {
+          zoomIn: true,
+          zoomOut: true,
+          oneToOne: true,
+          reset: true,
+          prev: false,
+          play: false,
+          next: false,
+          rotateLeft: false,
+          rotateRight: false,
+          flipHorizontal: false,
+          flipVertical: false,
+        },
+        keyboard: true,
+        backdrop: true,
+        loop: false,
+        viewed() {
+          // Zoom to fit when image is viewed
+          viewerRef.current.zoomTo(1);
+        },
+      });
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (viewerRef.current) {
+        viewerRef.current.destroy();
+      }
+    };
+  }, [imageUrl]);
+
+  const handleClick = () => {
+    if (viewerRef.current) {
+      viewerRef.current.show();
+    }
+  };
+
   return (
-    <TransformWrapper
-      initialScale={1}
-      minScale={0.1}
-      maxScale={5}
-      centerOnInit={true}
+    <div 
+      style={{ 
+        width: '100%', 
+        height: 'calc(100vh - 280px)',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f5f5f5',
+      }}
+      onClick={handleClick}
     >
-      {({ zoomIn, zoomOut, resetTransform }) => (
-        <>
-          <Space style={{ marginBottom: 8 }}>
-            <Button icon={<ZoomInOutlined />} onClick={() => zoomIn()} size="small">
-              Zoom In
-            </Button>
-            <Button icon={<ZoomOutOutlined />} onClick={() => zoomOut()} size="small">
-              Zoom Out
-            </Button>
-            <Button icon={<ReloadOutlined />} onClick={() => resetTransform()} size="small">
-              Reset
-            </Button>
-          </Space>
-          <TransformComponent
-            wrapperStyle={{
-              width: '100%',
-              height: 'calc(100vh - 280px)',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              overflow: 'hidden',
-            }}
-            contentStyle={{
-              width: 'auto',
-              height: 'auto',
-            }}
-          >
-            <img
-              src={imageUrl}
-              alt="Preview"
-              style={{ 
-                maxWidth: '100%', 
-                maxHeight: '100%',
-                width: 'auto',
-                height: 'auto',
-                display: 'block',
-                objectFit: 'contain'
-              }}
-            />
-          </TransformComponent>
-        </>
-      )}
-    </TransformWrapper>
+      <img
+        ref={imageRef}
+        src={imageUrl}
+        alt="Preview"
+        style={{ 
+          maxWidth: '100%', 
+          maxHeight: '100%',
+          display: 'block',
+          objectFit: 'contain',
+        }}
+      />
+    </div>
   );
 }
 
