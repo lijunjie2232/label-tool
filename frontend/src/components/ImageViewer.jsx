@@ -23,7 +23,16 @@ function ImageViewer({ imageUrl }) {
               Reset
             </Button>
           </Space>
-          <TransformComponent>
+          <TransformComponent
+            wrapperStyle={{
+              width: '100%',
+              height: 'calc(100vh - 280px)',
+            }}
+            contentStyle={{
+              width: '100%',
+              height: '100%',
+            }}
+          >
             <img
               src={imageUrl}
               alt="Preview"
