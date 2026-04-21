@@ -14,6 +14,7 @@ function App() {
   const [currentView, setCurrentView] = useState('dataset');
   const [currentDataset, setCurrentDataset] = useState(null);
   const [datasetConfig, setDatasetConfig] = useState(null);
+  const [selectedImagePath, setSelectedImagePath] = useState(null);
 
   const handleDatasetSelect = (dataset, config, editMode = false) => {
     setCurrentDataset(dataset);
@@ -34,7 +35,10 @@ function App() {
           <ImageList
             dataset={currentDataset}
             config={datasetConfig}
-            onAnnotateClick={() => setCurrentView('annotate')}
+            onAnnotateClick={(imagePath) => {
+              setSelectedImagePath(imagePath);
+              setCurrentView('annotate');
+            }}
           />
         );
       case 'annotate':
@@ -42,7 +46,11 @@ function App() {
           <AnnotationView
             dataset={currentDataset}
             config={datasetConfig}
-            onBack={() => setCurrentView('images')}
+            initialImagePath={selectedImagePath}
+            onBack={() => {
+              setSelectedImagePath(null);
+              setCurrentView('images');
+            }}
           />
         );
       case 'inference':
