@@ -30,7 +30,7 @@ function ImagePreview({ path, onAnnotateClick }) {
       src={imageUrl || ''}
       alt="preview"
       style={{ width: 80, height: 80, objectFit: 'cover', cursor: 'pointer' }}
-      onClick={() => onAnnotateClick()}
+      onClick={() => onAnnotateClick(path)}
     />
   );
 }
@@ -188,7 +188,7 @@ function ImageList({ dataset, config, onAnnotateClick }) {
       key: 'preview',
       width: 120,
       render: (path) => (
-        <ImagePreview path={path} onAnnotateClick={onAnnotateClick} />
+        <ImagePreview path={path} onAnnotateClick={() => onAnnotateClick(path)} />
       ),
     },
     {
@@ -243,7 +243,7 @@ function ImageList({ dataset, config, onAnnotateClick }) {
       width: 200,
       render: (_, record) => (
         <Space>
-          <Button size="small" onClick={() => onAnnotateClick()}>
+          <Button size="small" onClick={() => onAnnotateClick(record.relative_path)}>
             Annotate
           </Button>
           <Button size="small" danger onClick={() => handleDelete(record)}>
