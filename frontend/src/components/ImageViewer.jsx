@@ -27,16 +27,27 @@ function ImageViewer({ imageUrl }) {
             wrapperStyle={{
               width: '100%',
               height: 'calc(100vh - 280px)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              overflow: 'hidden',
             }}
             contentStyle={{
-              width: '100%',
-              height: '100%',
+              width: 'auto',
+              height: 'auto',
             }}
           >
             <img
               src={imageUrl}
               alt="Preview"
-              style={{ maxWidth: '100%', display: 'block' }}
+              style={{ 
+                maxWidth: '100%', 
+                maxHeight: '100%',
+                width: 'auto',
+                height: 'auto',
+                display: 'block',
+                objectFit: 'contain'
+              }}
             />
           </TransformComponent>
         </>
