@@ -22,7 +22,7 @@ def create_dataset(root_path: str, config: Dict) -> Dict:
         'min_score': config.get('min_score', 0),
         'max_score': config.get('max_score', 10),
         'score_step': config.get('score_step', 1),
-        'image_regex': config.get('image_regex', r'.*\.(jpg|jpeg|png|gif|bmp)$'),
+        'image_regex': config.get('image_regex', r'.*\.(jpg|jpeg|png|bmp|webp)$'),
         'annotated_on_top': config.get('annotated_on_top', 'top')
     }
     

@@ -144,7 +144,7 @@ def scan_images(root_path: str, sub_dir: str, config: Dict, recursive: bool = Tr
         return images
     
     # 获取图像正则表达式
-    image_regex = config.get('image_regex', r'.*\.(jpg|jpeg|png|gif|bmp)$')
+    image_regex = config.get('image_regex', r'.*\.(jpg|jpeg|png|bmp|webp)$')
     pattern = re.compile(image_regex, re.IGNORECASE)
     
     # 根据recursive参数决定扫描方式

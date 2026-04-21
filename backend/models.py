@@ -7,7 +7,7 @@ class DatasetConfig(BaseModel):
     min_score: float = 0
     max_score: float = 10
     score_step: float = 1
-    image_regex: str = r".*\.(jpg|jpeg|png|gif|bmp)$"
+    image_regex: str = r".*\.(jpg|jpeg|png|bmp|webp)$"
     annotated_on_top: str = "top"  # top/bottom/not_set
 
 

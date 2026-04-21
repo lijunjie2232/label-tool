@@ -31,7 +31,7 @@ function DatasetList({ onDatasetSelect }) {
                 min_score: values.min_score || 0,
                 max_score: values.max_score || 10,
                 score_step: values.score_step || 1,
-                image_regex: values.image_regex || '.*\.(jpg|jpeg|png|gif|bmp)$',
+                image_regex: values.image_regex || '.*\.(jpg|jpeg|png|bmp|webp)$',
                 annotated_on_top: values.annotated_on_top || 'top'
             };
 

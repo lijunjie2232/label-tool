@@ -195,7 +195,7 @@ function DatasetConfigEditor({ dataset, config, onSave, onCancel }) {
           label="Image Regex Filter"
           rules={[{ required: true, message: 'Please input image regex!' }]}
         >
-          <Input placeholder=".*\.(jpg|jpeg|png|gif|bmp)$" disabled={!isEditing} />
+          <Input placeholder=".*\.(jpg|jpeg|png|bmp|webp)$" disabled={!isEditing} />
         </Form.Item>
 
         <Form.Item 
