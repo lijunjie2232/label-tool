@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, InputNumber, Space, message, Select, Switch } from 'antd';
+import { Button, InputNumber, Space, message, Select } from 'antd';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import ImageViewer from './ImageViewer';
 import { imageAPI, annotationAPI } from '../services/api';
@@ -9,15 +9,13 @@ function AnnotationView({ dataset, config, onBack }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(null);
   const [sortBy, setSortBy] = useState('file_name');
-  const [annotatedOnTop, setAnnotatedOnTop] = useState(config?.annotated_on_top || 'top');
-  const [recursive, setRecursive] = useState(true);
   const inputRef = useRef(null);
 
   useEffect(() => {
     if (dataset) {
       loadImages();
     }
-  }, [dataset, sortBy, annotatedOnTop, recursive]);
+  }, [dataset, sortBy]);
 
   useEffect(() => {
     if (images.length > 0 && currentIndex < images.length) {
@@ -33,14 +31,9 @@ function AnnotationView({ dataset, config, onBack }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // 如果焦点在输入框，只处理特定快捷键
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.className?.includes('ant-input-number-input')) {
-        if (e.key === 'Enter') {
-          handleSubmit();
-          e.preventDefault();
-        }
-        return;
-      }
+      // Check if focus is on input element
+      const isInputFocused = document.activeElement?.tagName === 'INPUT' || 
+                             document.activeElement?.className?.includes('ant-input-number-input');
 
       switch (e.key) {
         case 'PageUp':
@@ -56,13 +49,17 @@ function AnnotationView({ dataset, config, onBack }) {
         case 'Backspace':
           if (inputRef.current) {
             inputRef.current.focus();
-            // 稍微延迟以确保 focus 生效后 select
-            setTimeout(() => inputRef.current.select(), 0);
+            // Select all text after focus
+            setTimeout(() => {
+              if (inputRef.current) {
+                inputRef.current.select();
+              }
+            }, 0);
           }
           e.preventDefault();
           break;
         case '+':
-        case '=': // 某些键盘布局 '+' 需要 Shift，而 '=' 是直接按键
+        case '=': // Some keyboard layouts require Shift for '+', while '=' is direct
           handleAddStep();
           e.preventDefault();
           break;
@@ -70,6 +67,13 @@ function AnnotationView({ dataset, config, onBack }) {
         case '_':
           handleSubStep();
           e.preventDefault();
+          break;
+        case 'Enter':
+          // Only handle Enter if not already in an input that needs it for other purposes
+          if (!isInputFocused || document.activeElement === inputRef.current) {
+            handleSubmit();
+            e.preventDefault();
+          }
           break;
         default:
           break;
@@ -85,8 +89,8 @@ function AnnotationView({ dataset, config, onBack }) {
       const response = await imageAPI.getList(dataset, {
         sub_dir: '',
         sort_by: sortBy,
-        annotated_on_top: annotatedOnTop,
-        recursive: recursive
+        annotated_on_top: 'not_set',
+        recursive: true
       });
       setImages(response.data.images || []);
       setCurrentIndex(0);
@@ -96,13 +100,16 @@ function AnnotationView({ dataset, config, onBack }) {
   };
 
   const handleSubmit = async () => {
+    // Skip if score is null, undefined, or out of bounds
     if (score === null || score === undefined) {
-      message.warning('Please enter a score');
+      message.info('Skipped - no score entered');
+      handleNext();
       return;
     }
 
     if (score < config.min_score || score > config.max_score) {
-      message.error(`Score must be between ${config.min_score} and ${config.max_score}`);
+      message.info(`Skipped - score ${score} is out of range (${config.min_score}-${config.max_score})`);
+      handleNext();
       return;
     }
 
@@ -144,9 +151,44 @@ function AnnotationView({ dataset, config, onBack }) {
     setScore(newScore);
   };
 
-  if (images.length === 0) {
-    return <div>No images to annotate</div>;
-  }
+  // Handle keyboard events specifically for the score input
+  const handleInputKeyDown = (e) => {
+    switch (e.key) {
+      case 'PageUp':
+      case 'ArrowUp':
+        handlePrevious();
+        e.preventDefault();
+        break;
+      case 'PageDown':
+      case 'ArrowDown':
+        handleNext();
+        e.preventDefault();
+        break;
+      case 'Backspace':
+        // Select all text when Backspace is pressed
+        if (inputRef.current?.input) {
+          inputRef.current.input.select();
+        }
+        e.preventDefault();
+        break;
+      case '+':
+      case '=':
+        handleAddStep();
+        e.preventDefault();
+        break;
+      case '-':
+      case '_':
+        handleSubStep();
+        e.preventDefault();
+        break;
+      case 'Enter':
+        handleSubmit();
+        e.preventDefault();
+        break;
+      default:
+        break;
+    }
+  };
 
   const [imageBlobUrls, setImageBlobUrls] = useState({});
 
@@ -210,6 +252,10 @@ function AnnotationView({ dataset, config, onBack }) {
     };
   }, [currentIndex, images]);
 
+  if (images.length === 0) {
+    return <div>No images to annotate</div>;
+  }
+
   const currentImage = images[currentIndex];
   const imageUrl = currentImage ? (imageBlobUrls[currentImage.absolute_path] || '') : '';
 
@@ -235,6 +281,7 @@ function AnnotationView({ dataset, config, onBack }) {
               ref={inputRef}
               value={score}
               onChange={setScore}
+              onKeyDown={handleInputKeyDown}
               min={config.min_score}
               max={config.max_score}
               step={config.score_step}
@@ -270,20 +317,6 @@ function AnnotationView({ dataset, config, onBack }) {
                 <Select.Option value="file_name">File Name</Select.Option>
                 <Select.Option value="random">Random</Select.Option>
               </Select>
-            </div>
-            <div>
-              <span>Annotated on top: </span>
-              <Switch
-                checked={annotatedOnTop === 'top'}
-                onChange={(checked) => setAnnotatedOnTop(checked ? 'top' : 'not_set')}
-              />
-            </div>
-            <div>
-              <span>Recursive: </span>
-              <Switch
-                checked={recursive}
-                onChange={setRecursive}
-              />
             </div>
           </Space>
         </div>
