@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Select, Button, Space, message, InputNumber } from 'antd';
 import { inferenceAPI, annotationAPI, imageAPI } from '../services/api';
+import imageCache from '../utils/imageCache';
 
 function ResultMerger({ dataset, config }) {
   const [files, setFiles] = useState([]);
@@ -18,15 +19,41 @@ function ResultMerger({ dataset, config }) {
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
+    let createdUrl = null;
+
     if (results.length > 0 && currentIndex < results.length) {
       setScore(results[currentIndex].score);
       
-      // 使用 POST 请求获取图片预览
+      // Construct full image path
       const imagePath = `${dataset}/${results[currentIndex].image_path}`;
-      imageAPI.getPreview(imagePath)
-        .then(response => {
-          const url = URL.createObjectURL(response.data);
+      
+      // Check if image is already cached
+      if (imageCache.has(imagePath)) {
+        const blob = imageCache.get(imagePath);
+        const url = URL.createObjectURL(blob);
+        createdUrl = url;
+        if (isMounted) {
           setCurrentImageUrl(url);
+        }
+        return () => {
+          if (createdUrl) {
+            URL.revokeObjectURL(createdUrl);
+          }
+        };
+      }
+
+      // Use the global cache to fetch and cache the image
+      imageCache.fetchAndCache(
+        imagePath,
+        () => imageAPI.getPreview(imagePath).then(response => response.data)
+      )
+        .then(blob => {
+          if (isMounted) {
+            const url = URL.createObjectURL(blob);
+            createdUrl = url;
+            setCurrentImageUrl(url);
+          }
         })
         .catch(error => {
           console.error('Failed to load image:', error);
@@ -34,8 +61,9 @@ function ResultMerger({ dataset, config }) {
     }
     
     return () => {
-      if (currentImageUrl) {
-        URL.revokeObjectURL(currentImageUrl);
+      isMounted = false;
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
       }
     };
   }, [currentIndex, results, dataset]);
@@ -169,7 +197,7 @@ function ResultMerger({ dataset, config }) {
           />
         </div>
 
-        <Space direction="vertical" style={{ width: '100%' }}>
+        <Space orientation="vertical" style={{ width: '100%' }}>
           <Button type="primary" onClick={handleSubmit} block>
             Submit & Next
           </Button>
