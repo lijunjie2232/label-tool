@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Layout, Menu } from 'antd';
+import { useState, useEffect } from 'react';
+import { Layout, Menu, Button, Space, Badge } from 'antd';
 import DatasetList from './components/DatasetList';
 import ImageList from './components/ImageList';
 import AnnotationView from './components/AnnotationView';
 import InferenceResultViewer from './components/InferenceResultViewer';
 import ResultMerger from './components/ResultMerger';
 import DatasetConfigEditor from './components/DatasetConfigEditor';
+import imageCacheManager from './utils/imageCacheManager';
 import 'antd/dist/reset.css';
 
 const { Header, Sider, Content } = Layout;
@@ -15,6 +16,24 @@ function App() {
   const [currentDataset, setCurrentDataset] = useState(null);
   const [datasetConfig, setDatasetConfig] = useState(null);
   const [annotationStartImage, setAnnotationStartImage] = useState(null);
+  const [cacheStats, setCacheStats] = useState({ size: 0, maxSize: 100, loading: 0 });
+
+  useEffect(() => {
+    // Update cache stats periodically
+    const interval = setInterval(() => {
+      setCacheStats(imageCacheManager.getStats());
+    }, 2000);
+    
+    // Initial update
+    setCacheStats(imageCacheManager.getStats());
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleClearCache = () => {
+    imageCacheManager.clear();
+    setCacheStats(imageCacheManager.getStats());
+  };
 
   const handleDatasetSelect = (dataset, config, editMode = false) => {
     setCurrentDataset(dataset);
@@ -93,10 +112,18 @@ function App() {
         />
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
+        <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '16px' }}>
             {currentDataset ? `Dataset: ${currentDataset}` : 'No Dataset Selected'}
           </span>
+          <Space>
+            <Badge count={cacheStats.loading} showZero color="blue" style={{ backgroundColor: '#1890ff' }}>
+              <span style={{ marginRight: 8 }}>Cache: {cacheStats.size}/{cacheStats.maxSize}</span>
+            </Badge>
+            <Button size="small" onClick={handleClearCache}>
+              Clear Cache
+            </Button>
+          </Space>
         </Header>
         <Content style={{ margin: '16px', padding: '16px', background: '#fff', minHeight: 'calc(100vh - 112px)' }}>
           {renderContent()}
