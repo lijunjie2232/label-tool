@@ -3,6 +3,7 @@ import { Button, InputNumber, Space, message, Select, Switch } from 'antd';
 import { LeftOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons';
 import ImageViewer from './ImageViewer';
 import { imageAPI, annotationAPI } from '../services/api';
+import imageCache from '../utils/imageCache';
 
 function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   const [images, setImages] = useState([]);
@@ -195,23 +196,28 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
     try {
       message.loading('Refreshing image...', 0);
       
+      const imagePath = currentImage.absolute_path;
+      
       // Clear the current image blob URL
-      if (currentImage && imageBlobUrls[currentImage.absolute_path]) {
-        URL.revokeObjectURL(imageBlobUrls[currentImage.absolute_path]);
+      if (currentImage && blobUrlsRef.current[imagePath]) {
+        URL.revokeObjectURL(blobUrlsRef.current[imagePath]);
+        delete blobUrlsRef.current[imagePath];
+        
         setImageBlobUrls(prev => {
           const updated = { ...prev };
-          delete updated[currentImage.absolute_path];
+          delete updated[imagePath];
           return updated;
         });
       }
       
-      // Reload the current image
-      const response = await imageAPI.getPreview(currentImage.absolute_path);
+      // Reload the current image (bypass cache)
+      const response = await imageAPI.getPreview(imagePath);
       const url = URL.createObjectURL(response.data);
       
+      blobUrlsRef.current[imagePath] = url;
       setImageBlobUrls(prev => ({
         ...prev,
-        [currentImage.absolute_path]: url
+        [imagePath]: url
       }));
       
       message.destroy();
@@ -289,73 +295,100 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   };
 
   const [imageBlobUrls, setImageBlobUrls] = useState({});
+  const blobUrlsRef = useRef({});
 
   useEffect(() => {
     if (filteredImages.length === 0) return;
 
-    // 确定需要加载的图片索引：当前、前一张、后一张
-    const indicesToLoad = new Set();
-    indicesToLoad.add(currentIndex);
-    if (currentIndex > 0) indicesToLoad.add(currentIndex - 1);
-    if (currentIndex < filteredImages.length - 1) indicesToLoad.add(currentIndex + 1);
+    // Determine which images to load: current, previous, and next
+    const indicesToKeep = new Set();
+    indicesToKeep.add(currentIndex);
+    if (currentIndex > 0) indicesToKeep.add(currentIndex - 1);
+    if (currentIndex < filteredImages.length - 1) indicesToKeep.add(currentIndex + 1);
 
-    // 过滤出尚未加载的图片
+    const pathsToKeep = new Set();
+    indicesToKeep.forEach(index => {
+      pathsToKeep.add(filteredImages[index].absolute_path);
+    });
+
+    // Filter out images that are already loaded
     const imagesToLoad = [];
-    indicesToLoad.forEach(index => {
-      if (!imageBlobUrls[filteredImages[index].absolute_path]) {
+    indicesToKeep.forEach(index => {
+      const imagePath = filteredImages[index].absolute_path;
+      if (!blobUrlsRef.current[imagePath]) {
         imagesToLoad.push({ index, image: filteredImages[index] });
       }
     });
 
-    if (imagesToLoad.length === 0) return;
+    // Cleanup URLs not in sliding window to prevent memory leaks
+    const currentPaths = Object.keys(blobUrlsRef.current);
+    currentPaths.forEach(path => {
+      if (!pathsToKeep.has(path)) {
+        URL.revokeObjectURL(blobUrlsRef.current[path]);
+        delete blobUrlsRef.current[path];
+      }
+    });
 
-    // 并行加载所有需要的图片
+    // If there are no new images to load, just update the state with current sliding window
+    if (imagesToLoad.length === 0) {
+      setImageBlobUrls({ ...blobUrlsRef.current });
+      return;
+    }
+
+    let isMounted = true;
+
+    // Load images using the global cache
     Promise.all(
-      imagesToLoad.map(({ index, image }) => 
-        imageAPI.getPreview(image.absolute_path)
-          .then(response => {
-            const url = URL.createObjectURL(response.data);
-            return { path: image.absolute_path, url, index };
-          })
-          .catch(error => {
-            console.error(`Failed to load image ${image.absolute_path}:`, error);
-            return null;
-          })
-      )
+      imagesToLoad.map(async ({ index, image }) => {
+        try {
+          // Use the global cache to fetch and cache the image
+          const blob = await imageCache.fetchAndCache(
+            image.absolute_path,
+            () => imageAPI.getPreview(image.absolute_path).then(response => response.data)
+          );
+          
+          // Create object URL for display
+          const url = URL.createObjectURL(blob);
+          return { path: image.absolute_path, url, index };
+        } catch (error) {
+          console.error(`Failed to load image ${image.absolute_path}:`, error);
+          return null;
+        }
+      })
     ).then(results => {
-      setImageBlobUrls(prev => {
-        const updated = { ...prev };
+      if (isMounted) {
         results.forEach(result => {
           if (result) {
-            updated[result.path] = result.url;
+            blobUrlsRef.current[result.path] = result.url;
           }
         });
-        return updated;
-      });
+        setImageBlobUrls({ ...blobUrlsRef.current });
+      } else {
+        // If component unmounted while loading, revoke these URLs
+        results.forEach(result => {
+          if (result) URL.revokeObjectURL(result.url);
+        });
+      }
     });
     
     return () => {
-      // 清理不在视野范围内的图片 URL
-      const visiblePaths = new Set();
-      for (let i = Math.max(0, currentIndex - 1); i <= Math.min(filteredImages.length - 1, currentIndex + 1); i++) {
-        visiblePaths.add(filteredImages[i].absolute_path);
-      }
-      
-      Object.keys(imageBlobUrls).forEach(path => {
-        if (!visiblePaths.has(path)) {
-          URL.revokeObjectURL(imageBlobUrls[path]);
-          delete imageBlobUrls[path];
-        }
-      });
+      isMounted = false;
     };
   }, [currentIndex, filteredImages]);
+
+  // Final cleanup on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(blobUrlsRef.current).forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   if (filteredImages.length === 0) {
     return <div>{hideAnnotated ? 'No unannotated images available' : 'No images to annotate'}</div>;
   }
 
   const currentImage = filteredImages[currentIndex];
-  const imageUrl = currentImage ? (imageBlobUrls[currentImage.absolute_path] || '') : '';
+  const imageUrl = currentImage ? (imageBlobUrls[currentImage.absolute_path] || null) : null;
 
   return (
     <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 200px)' }}>
@@ -369,13 +402,65 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
         <div>
           <h3>Current Image</h3>
           <p style={{ fontSize: 12, wordBreak: 'break-all' }}>{currentImage.relative_path}</p>
-          <p>Progress: {currentIndex + 1} / {filteredImages.length} {hideAnnotated && '(unannotated only)'}</p>
-          {hideAnnotated && <p style={{ fontSize: 12, color: '#999' }}>Total images: {images.length}, Annotated: {images.filter(img => img.is_annotated).length}</p>}
+          
+          {/* Progress Information */}
+          <div style={{ 
+            padding: '12px', 
+            background: '#f5f5f5', 
+            borderRadius: '4px',
+            marginTop: '8px'
+          }}>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>Progress:</strong> {currentIndex + 1} / {images.length}
+              {hideAnnotated && <span style={{ color: '#1890ff', marginLeft: '8px' }}>(viewing unannotated only)</span>}
+            </div>
+            
+            {/* Progress Bar - Annotated vs Total */}
+            <div style={{
+              width: '100%',
+              height: '8px',
+              background: '#e0e0e0',
+              borderRadius: '4px',
+              overflow: 'hidden',
+              marginBottom: '8px'
+            }}>
+              <div style={{
+                width: `${images.length > 0 ? ((images.filter(img => img.is_annotated).length / images.length) * 100) : 0}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #52c41a 0%, #73d13d 100%)',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+            
+            {/* Detailed Statistics */}
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span>Total Images:</span>
+                <strong>{images.length}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span>Annotated:</span>
+                <strong style={{ color: '#52c41a' }}>{images.filter(img => img.is_annotated).length}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span>Remaining:</span>
+                <strong style={{ color: '#faad14' }}>{images.filter(img => !img.is_annotated).length}</strong>
+              </div>
+              {hideAnnotated && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid #d9d9d9' }}>
+                  <span>Completion Rate:</span>
+                  <strong style={{ color: '#1890ff' }}>
+                    {images.length > 0 ? ((images.filter(img => img.is_annotated).length / images.length) * 100).toFixed(1) : 0}%
+                  </strong>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div>
           <h4>Score Annotation</h4>
-          <Space direction="vertical" style={{ width: '100%' }}>
+          <Space orientation="vertical" style={{ width: '100%' }}>
             <InputNumber
               ref={inputRef}
               value={score}
@@ -407,7 +492,7 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
 
         <div>
           <h4>Settings</h4>
-          <Space direction="vertical" style={{ width: '100%' }}>
+          <Space orientation="vertical" style={{ width: '100%' }}>
             <div>
               <span>Sort by: </span>
               <Select
