@@ -1,26 +1,54 @@
 import { useState, useEffect } from 'react';
 import { Table, Select, Button, Space, message } from 'antd';
 import { inferenceAPI, imageAPI } from '../services/api';
+import imageCache from '../utils/imageCache';
 
 // 图片预览组件，使用 POST 请求获取图片
 function ImagePreview({ dataset, path }) {
   const [imageUrl, setImageUrl] = useState(null);
 
   useEffect(() => {
-    // 使用 POST 请求获取图片预览
+    let isMounted = true;
+    let createdUrl = null;
+
+    // Construct full image path
     const imagePath = `${dataset}/${path}`;
-    imageAPI.getPreview(imagePath)
-      .then(response => {
-        const url = URL.createObjectURL(response.data);
+    
+    // Check if image is already cached
+    if (imageCache.has(imagePath)) {
+      const blob = imageCache.get(imagePath);
+      const url = URL.createObjectURL(blob);
+      createdUrl = url;
+      if (isMounted) {
         setImageUrl(url);
+      }
+      return () => {
+        if (createdUrl) {
+          URL.revokeObjectURL(createdUrl);
+        }
+      };
+    }
+
+    // Use the global cache to fetch and cache the image
+    imageCache.fetchAndCache(
+      imagePath,
+      () => imageAPI.getPreview(imagePath).then(response => response.data)
+    )
+      .then(blob => {
+        if (isMounted) {
+          const url = URL.createObjectURL(blob);
+          createdUrl = url;
+          setImageUrl(url);
+        }
       })
       .catch(error => {
         console.error('Failed to load image:', error);
       });
     
     return () => {
-      if (imageUrl) {
-        URL.revokeObjectURL(imageUrl);
+      isMounted = false;
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
       }
     };
   }, [dataset, path]);
