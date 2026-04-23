@@ -93,7 +93,7 @@ function DatasetList({ onDatasetSelect }) {
     return (
         <div>
             <Card title="Existing Datasets">
-                <Space direction="vertical" style={{ width: '100%' }}>
+                <Space orientation="vertical" style={{ width: '100%' }}>
                     {datasets.length > 0 ? (
                         datasets.map((item, index) => (
                             <div
