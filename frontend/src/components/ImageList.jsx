@@ -2,32 +2,58 @@ import { useState, useEffect } from 'react';
 import { Table, Button, InputNumber, Space, message, Dropdown, Select, Radio, Input, Switch } from 'antd';
 import { MinusOutlined, PlusOutlined, DownOutlined } from '@ant-design/icons';
 import { imageAPI, annotationAPI } from '../services/api';
+import imageCache from '../utils/imageCache';
 
 // 图片预览组件，使用 POST 请求获取图片
 function ImagePreview({ path, onAnnotateClick }) {
   const [imageUrl, setImageUrl] = useState(null);
 
   useEffect(() => {
-    // 使用 POST 请求获取图片预览
-    imageAPI.getPreview(path)
-      .then(response => {
-        const url = URL.createObjectURL(response.data);
+    let isMounted = true;
+    let createdUrl = null;
+
+    // Check if image is already cached
+    if (imageCache.has(path)) {
+      const blob = imageCache.get(path);
+      const url = URL.createObjectURL(blob);
+      createdUrl = url;
+      if (isMounted) {
         setImageUrl(url);
+      }
+      return () => {
+        if (createdUrl) {
+          URL.revokeObjectURL(createdUrl);
+        }
+      };
+    }
+
+    // Use the global cache to fetch and cache the image
+    imageCache.fetchAndCache(
+      path,
+      () => imageAPI.getPreview(path).then(response => response.data)
+    )
+      .then(blob => {
+        if (isMounted) {
+          const url = URL.createObjectURL(blob);
+          createdUrl = url;
+          setImageUrl(url);
+        }
       })
       .catch(error => {
         console.error('Failed to load image:', error);
       });
     
     return () => {
-      if (imageUrl) {
-        URL.revokeObjectURL(imageUrl);
+      isMounted = false;
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
       }
     };
   }, [path]);
 
   return (
     <img
-      src={imageUrl || ''}
+      src={imageUrl}
       alt="preview"
       style={{ width: 80, height: 80, objectFit: 'cover', cursor: 'pointer' }}
       onClick={() => onAnnotateClick(path)}
