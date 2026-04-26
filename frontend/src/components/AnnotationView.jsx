@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Button,
-  TextField,
   Box,
   Stack,
   Typography,
@@ -26,6 +25,7 @@ import { imageAPI, annotationAPI } from '../services/api';
 import imageCache from '../utils/imageCache';
 import useToast from '../hooks/useToast';
 import Toast from './Toast';
+import NumberField from './NumberField';
 
 function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   const { success, error, info, toastOpen, toastMessage, toastSeverity, hideToast } = useToast();
@@ -73,10 +73,6 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Check if focus is on input element
-      const isInputFocused = document.activeElement?.tagName === 'INPUT' || 
-                             document.activeElement?.className?.includes('ant-input-number-input');
-
       switch (e.key) {
         case 'PageUp':
         case 'ArrowUp':
@@ -111,11 +107,8 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
           e.preventDefault();
           break;
         case 'Enter':
-          // Only handle Enter if not already in an input that needs it for other purposes
-          if (!isInputFocused || document.activeElement === inputRef.current) {
-            handleSubmit();
-            e.preventDefault();
-          }
+          handleSubmit();
+          e.preventDefault();
           break;
         default:
           break;
@@ -265,52 +258,13 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   };
 
   const handleAddStep = () => {
-    const newScore = Math.min((score || 0) + config.score_step, config.max_score);
+    const newScore = Math.min((score || config.min_score) + config.score_step, config.max_score);
     setScore(newScore);
   };
 
   const handleSubStep = () => {
-    const newScore = Math.max((score || 0) - config.score_step, config.min_score);
+    const newScore = Math.max((score || config.min_score) - config.score_step, config.min_score);
     setScore(newScore);
-  };
-
-  // Handle keyboard events specifically for the score input
-  const handleInputKeyDown = (e) => {
-    switch (e.key) {
-      case 'PageUp':
-      case 'ArrowUp':
-        handlePrevious();
-        e.preventDefault();
-        break;
-      case 'PageDown':
-      case 'ArrowDown':
-        handleNext();
-        e.preventDefault();
-        break;
-      case 'Backspace':
-        // Select all text when Backspace is pressed
-        if (inputRef.current?.input) {
-          inputRef.current.input.select();
-        }
-        e.preventDefault();
-        break;
-      case '+':
-      case '=':
-        handleAddStep();
-        e.preventDefault();
-        break;
-      case '-':
-      case '_':
-        handleSubStep();
-        e.preventDefault();
-        break;
-      case 'Enter':
-        handleSubmit();
-        e.preventDefault();
-        break;
-      default:
-        break;
-    }
   };
 
   const [imageBlobUrls, setImageBlobUrls] = useState({});
@@ -508,53 +462,15 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
             Score Annotation
           </Typography>
           <Stack spacing={2}>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              <Button 
-                variant="outlined"
-                onClick={() => {
-                  const newScore = Math.max((score || config.min_score) - config.score_step, config.min_score);
-                  setScore(newScore);
-                }}
-                sx={{ minWidth: 48 }}
-              >
-                -
-              </Button>
-              <TextField
-                inputRef={inputRef}
-                type="number"
-                value={score ?? ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '') {
-                    setScore(null);
-                  } else {
-                    const numVal = Number(val);
-                    // Round to nearest step
-                    const rounded = Math.round(numVal / config.score_step) * config.score_step;
-                    setScore(Math.max(config.min_score, Math.min(config.max_score, rounded)));
-                  }
-                }}
-                onKeyDown={handleInputKeyDown}
-                inputProps={{
-                  min: config.min_score,
-                  max: config.max_score,
-                  step: config.score_step,
-                }}
-                fullWidth
-                size="large"
-                variant="outlined"
-              />
-              <Button 
-                variant="outlined"
-                onClick={() => {
-                  const newScore = Math.min((score || config.min_score) + config.score_step, config.max_score);
-                  setScore(newScore);
-                }}
-                sx={{ minWidth: 48 }}
-              >
-                +
-              </Button>
-            </Box>
+            <NumberField
+              inputRef={inputRef}
+              value={score}
+              onChange={setScore}
+              min={config.min_score}
+              max={config.max_score}
+              step={config.score_step}
+              size="large"
+            />
             <Button 
               variant="contained" 
               onClick={handleSubmit} 
