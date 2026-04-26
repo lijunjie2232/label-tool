@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Box } from '@mui/material';
 import Viewer from 'viewerjs';
 import 'viewerjs/dist/viewer.css';
 
@@ -57,8 +58,8 @@ function ImageViewer({ imageUrl }) {
   };
 
   return (
-    <div 
-      style={{ 
+    <Box 
+      sx={{ 
         width: '100%', 
         height: 'calc(100vh - 280px)',
         overflow: 'hidden',
@@ -66,7 +67,9 @@ function ImageViewer({ imageUrl }) {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#fafafa',
+        borderRadius: 1,
+        boxShadow: 'inset 0 0 10px rgba(0,0,0,0.05)',
       }}
       onClick={handleClick}
     >
@@ -81,7 +84,7 @@ function ImageViewer({ imageUrl }) {
           objectFit: 'contain',
         }}
       />
-    </div>
+    </Box>
   );
 }
 
