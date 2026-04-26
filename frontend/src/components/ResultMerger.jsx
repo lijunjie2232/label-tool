@@ -1,9 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Select, Button, Space, message, InputNumber } from 'antd';
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
+  Box,
+  Stack,
+  Typography,
+  Paper,
+  TextField,
+} from '@mui/material';
 import { inferenceAPI, annotationAPI, imageAPI } from '../services/api';
 import imageCache from '../utils/imageCache';
+import useToast from '../hooks/useToast';
+import Toast from './Toast';
 
 function ResultMerger({ dataset, config }) {
+  const { success, error, warning, toastOpen, toastMessage, toastSeverity, hideToast } = useToast();
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [results, setResults] = useState([]);
@@ -73,7 +87,7 @@ function ResultMerger({ dataset, config }) {
       const response = await inferenceAPI.listFiles(dataset);
       setFiles(response.data.files || []);
     } catch (error) {
-      message.error('Failed to load inference files');
+      error('Failed to load inference files');
     }
   };
 
@@ -84,13 +98,13 @@ function ResultMerger({ dataset, config }) {
       setResults(response.data.results || []);
       setCurrentIndex(0);
     } catch (error) {
-      message.error('Failed to load results');
+      error('Failed to load results');
     }
   };
 
   const handleSubmit = async () => {
     if (score === null || score === undefined) {
-      message.warning('Please enter a score');
+      warning('Please enter a score');
       return;
     }
 
@@ -99,7 +113,7 @@ function ResultMerger({ dataset, config }) {
         image_path: results[currentIndex].image_path,
         score: score
       });
-      message.success('Annotation saved');
+      success('Annotation saved');
       
       // 更新本地结果
       const updatedResults = [...results];
@@ -111,21 +125,21 @@ function ResultMerger({ dataset, config }) {
         setCurrentIndex(currentIndex + 1);
       }
     } catch (error) {
-      message.error('Failed to save annotation');
+      error('Failed to save annotation');
     }
   };
 
   const handleMergeAll = async () => {
     if (!selectedFile) {
-      message.warning('Please select a file first');
+      warning('Please select a file first');
       return;
     }
 
     try {
       const response = await inferenceAPI.merge(dataset, selectedFile);
-      message.success(`Merged ${response.data.count} annotations`);
+      success(`Merged ${response.data.count} annotations`);
     } catch (error) {
-      message.error('Failed to merge results');
+      error('Failed to merge results');
     }
   };
 
@@ -143,19 +157,30 @@ function ResultMerger({ dataset, config }) {
 
   if (results.length === 0) {
     return (
-      <div>
-        <Space style={{ marginBottom: 16 }}>
-          <span>Select Inference File:</span>
-          <Select
-            value={selectedFile}
-            onChange={handleFileChange}
-            style={{ width: 300 }}
-            options={files.map(f => ({ label: f, value: f }))}
-            placeholder="Select a file"
-          />
-        </Space>
-        <p>No results loaded. Please select an inference file.</p>
-      </div>
+      <Box>
+        <Paper sx={{ p: 3 }}>
+          <Stack spacing={2}>
+            <Typography variant="h6" fontWeight="bold">
+              Merge Inference Results
+            </Typography>
+            <FormControl sx={{ minWidth: 300 }} size="small">
+              <InputLabel>Select Inference File</InputLabel>
+              <Select
+                value={selectedFile || ''}
+                label="Select Inference File"
+                onChange={(e) => handleFileChange(e.target.value)}
+              >
+                {files.map((f) => (
+                  <MenuItem key={f} value={f}>{f}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Typography color="text.secondary">
+              No results loaded. Please select an inference file.
+            </Typography>
+          </Stack>
+        </Paper>
+      </Box>
     );
   }
 
@@ -163,64 +188,106 @@ function ResultMerger({ dataset, config }) {
   const imageUrl = currentImageUrl || '';
 
   return (
-    <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 200px)' }}>
-      {/* 左侧图像 */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+    <Box sx={{ display: 'flex', gap: 3, height: 'calc(100vh - 200px)' }}>
+      {/* Left side - Image */}
+      <Paper sx={{ flex: 1, overflow: 'auto', p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <img
           src={imageUrl}
           alt="Current"
-          style={{ maxWidth: '100%', maxHeight: '100%' }}
+          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
         />
-      </div>
+      </Paper>
 
-      {/* 右侧控制面板 */}
-      <div style={{ width: 350, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div>
-          <h3>Merge Inference Results</h3>
-          <p>File: {selectedFile}</p>
-          <p>Progress: {currentIndex + 1} / {results.length}</p>
-          <p style={{ wordBreak: 'break-all', fontSize: 12 }}>
+      {/* Right side - Control Panel */}
+      <Paper sx={{ width: 380, p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Box>
+          <Typography variant="h6" gutterBottom fontWeight="bold">
+            Merge Inference Results
+          </Typography>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            File: <strong>{selectedFile}</strong>
+          </Typography>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Progress: {currentIndex + 1} / {results.length}
+          </Typography>
+          <Typography 
+            variant="caption" 
+            sx={{ wordBreak: 'break-all', display: 'block', mt: 1, color: '#666' }}
+          >
             {currentResult.image_path}
-          </p>
-        </div>
+          </Typography>
+        </Box>
 
-        <div>
-          <h4>Inferred Score</h4>
-          <InputNumber
-            value={score}
-            onChange={setScore}
-            min={config.min_score}
-            max={config.max_score}
-            step={config.score_step}
-            style={{ width: '100%' }}
+        <Box>
+          <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+            Inferred Score
+          </Typography>
+          <TextField
+            type="number"
+            value={score || ''}
+            onChange={(e) => setScore(e.target.value === '' ? null : Number(e.target.value))}
+            inputProps={{
+              min: config.min_score,
+              max: config.max_score,
+              step: config.score_step,
+            }}
+            fullWidth
             size="large"
+            variant="outlined"
           />
-        </div>
+        </Box>
 
-        <Space orientation="vertical" style={{ width: '100%' }}>
-          <Button type="primary" onClick={handleSubmit} block>
+        <Stack spacing={2}>
+          <Button 
+            variant="contained" 
+            onClick={handleSubmit} 
+            fullWidth
+            size="large"
+          >
             Submit & Next
           </Button>
-          <Space>
-            <Button onClick={handlePrevious} disabled={currentIndex === 0}>
+          <Stack direction="row" spacing={1}>
+            <Button 
+              onClick={handlePrevious} 
+              disabled={currentIndex === 0}
+              fullWidth
+            >
               Previous
             </Button>
-            <Button onClick={handleNext} disabled={currentIndex === results.length - 1}>
+            <Button 
+              onClick={handleNext} 
+              disabled={currentIndex === results.length - 1}
+              fullWidth
+            >
               Next
             </Button>
-          </Space>
-        </Space>
+          </Stack>
+        </Stack>
 
-        <div style={{ marginTop: 'auto' }}>
-          <Button type="primary" onClick={handleMergeAll} block danger>
+        <Box sx={{ mt: 'auto' }}>
+          <Button 
+            variant="contained" 
+            color="error"
+            onClick={handleMergeAll} 
+            fullWidth
+            size="large"
+          >
             Merge All to Annotations
           </Button>
-          <p style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
             Warning: This will overwrite existing annotations
-          </p>
-        </div>
-      </div>
-    </div>
+          </Typography>
+        </Box>
+      </Paper>
+
+      {/* Toast Notification */}
+      <Toast 
+        open={toastOpen} 
+        message={toastMessage} 
+        severity={toastSeverity} 
+        onClose={hideToast} 
+      />
+    </Box>
   );
 }
 
