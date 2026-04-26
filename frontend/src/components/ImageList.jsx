@@ -23,6 +23,7 @@ import {
   Chip,
   Menu,
   Alert,
+  Checkbox,
 } from '@mui/material';
 import {
   Remove as MinusIcon,
@@ -417,9 +418,8 @@ function ImageList({ dataset, config, onAnnotateClick }) {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox">
-                <input
-                  type="checkbox"
+              <TableCell padding="checkbox" sx={{ width: 60 }}>
+                <Checkbox
                   checked={selectedRowKeys.length === images.length && images.length > 0}
                   onChange={(e) => {
                     if (e.target.checked) {
@@ -427,6 +427,11 @@ function ImageList({ dataset, config, onAnnotateClick }) {
                     } else {
                       setSelectedRowKeys([]);
                     }
+                  }}
+                  sx={{
+                    '& .MuiSvgIcon-root': {
+                      fontSize: 28,
+                    },
                   }}
                 />
               </TableCell>
@@ -447,9 +452,8 @@ function ImageList({ dataset, config, onAnnotateClick }) {
                   selected={isSelected}
                   sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                 >
-                  <TableCell padding="checkbox">
-                    <input
-                      type="checkbox"
+                  <TableCell padding="checkbox" sx={{ width: 60 }}>
+                    <Checkbox
                       checked={isSelected}
                       onChange={(e) => {
                         if (e.target.checked) {
@@ -457,6 +461,11 @@ function ImageList({ dataset, config, onAnnotateClick }) {
                         } else {
                           setSelectedRowKeys(selectedRowKeys.filter(key => key !== row.relative_path));
                         }
+                      }}
+                      sx={{
+                        '& .MuiSvgIcon-root': {
+                          fontSize: 28,
+                        },
                       }}
                     />
                   </TableCell>
