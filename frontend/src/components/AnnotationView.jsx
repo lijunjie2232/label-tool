@@ -1,11 +1,34 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, InputNumber, Space, message, Select, Switch } from 'antd';
-import { LeftOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  Button,
+  TextField,
+  Box,
+  Stack,
+  Typography,
+  Paper,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Switch,
+  FormControlLabel,
+  LinearProgress,
+  Chip,
+  Alert,
+} from '@mui/material';
+import {
+  ArrowBack as PreviousIcon,
+  ArrowForward as NextIcon,
+  Refresh as RefreshIcon,
+} from '@mui/icons-material';
 import ImageViewer from './ImageViewer';
 import { imageAPI, annotationAPI } from '../services/api';
 import imageCache from '../utils/imageCache';
+import useToast from '../hooks/useToast';
+import Toast from './Toast';
 
 function AnnotationView({ dataset, config, initialImagePath, onBack }) {
+  const { success, error, info, toastOpen, toastMessage, toastSeverity, hideToast } = useToast();
   const [images, setImages] = useState([]);
   const [filteredImages, setFilteredImages] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -146,13 +169,13 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   const handleSubmit = async () => {
     // Skip if score is null, undefined, or out of bounds
     if (score === null || score === undefined) {
-      message.info('Skipped - no score entered');
+      info('Skipped - no score entered');
       handleNext();
       return;
     }
 
     if (score < config.min_score || score > config.max_score) {
-      message.info(`Skipped - score ${score} is out of range (${config.min_score}-${config.max_score})`);
+      info(`Skipped - score ${score} is out of range (${config.min_score}-${config.max_score})`);
       handleNext();
       return;
     }
@@ -162,7 +185,7 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
         image_path: filteredImages[currentIndex].relative_path,
         score: score
       });
-      message.success('Annotation saved');
+      success('Annotation saved');
       
       // If hiding annotated images, we need to reload or refilter
       if (hideAnnotated) {
@@ -180,7 +203,7 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
         
         // Stay at same index (which is now the next unannotated image)
         if (newFiltered.length === 0) {
-          message.info('All images have been annotated!');
+          info('All images have been annotated!');
         } else if (currentIndex >= newFiltered.length) {
           setCurrentIndex(Math.max(0, newFiltered.length - 1));
         }
@@ -188,14 +211,12 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
         handleNext();
       }
     } catch (error) {
-      message.error('Failed to save annotation');
+      error('Failed to save annotation');
     }
   };
 
   const handleRefresh = async () => {
     try {
-      message.loading('Refreshing image...', 0);
-      
       const imagePath = currentImage.absolute_path;
       
       // Clear the current image blob URL
@@ -220,11 +241,9 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
         [imagePath]: url
       }));
       
-      message.destroy();
-      message.success('Image refreshed');
+      success('Image refreshed');
     } catch (error) {
-      message.destroy();
-      message.error('Failed to refresh image');
+      error('Failed to refresh image');
       console.error('Failed to refresh image:', error);
     }
   };
@@ -233,7 +252,7 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
     } else {
-      message.info('Already at first image');
+      info('Already at first image');
     }
   };
 
@@ -241,7 +260,7 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
     if (currentIndex < filteredImages.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
-      message.info('Already at last image');
+      info('Already at last image');
     }
   };
 
@@ -384,145 +403,208 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   }, []);
 
   if (filteredImages.length === 0) {
-    return <div>{hideAnnotated ? 'No unannotated images available' : 'No images to annotate'}</div>;
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="info">
+          {hideAnnotated ? 'No unannotated images available' : 'No images to annotate'}
+        </Alert>
+      </Box>
+    );
   }
 
   const currentImage = filteredImages[currentIndex];
   const imageUrl = currentImage ? (imageBlobUrls[currentImage.absolute_path] || null) : null;
+  const annotatedCount = images.filter(img => img.is_annotated).length;
+  const completionRate = images.length > 0 ? ((annotatedCount / images.length) * 100).toFixed(1) : 0;
 
   return (
-    <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 200px)' }}>
-      {/* 左侧图像查看器 */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+    <Box sx={{ display: 'flex', gap: 3, height: 'calc(100vh - 200px)' }}>
+      {/* Left side - Image Viewer */}
+      <Paper sx={{ flex: 1, overflow: 'auto', p: 2 }}>
         <ImageViewer imageUrl={imageUrl} />
-      </div>
+      </Paper>
 
-      {/* 右侧控制面板 */}
-      <div style={{ width: 350, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div>
-          <h3>Current Image</h3>
-          <p style={{ fontSize: 12, wordBreak: 'break-all' }}>{currentImage.relative_path}</p>
+      {/* Right side - Control Panel */}
+      <Paper sx={{ width: 380, p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {/* Current Image Info */}
+        <Box>
+          <Typography variant="h6" gutterBottom>Current Image</Typography>
+          <Typography variant="body2" sx={{ wordBreak: 'break-all', color: '#666', mb: 2 }}>
+            {currentImage.relative_path}
+          </Typography>
           
           {/* Progress Information */}
-          <div style={{ 
-            padding: '12px', 
+          <Box sx={{ 
+            p: 2, 
             background: '#f5f5f5', 
-            borderRadius: '4px',
-            marginTop: '8px'
+            borderRadius: 1,
           }}>
-            <div style={{ marginBottom: '8px' }}>
-              <strong>Progress:</strong> {currentIndex + 1} / {images.length}
-              {hideAnnotated && <span style={{ color: '#1890ff', marginLeft: '8px' }}>(viewing unannotated only)</span>}
-            </div>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                <strong>Progress:</strong> {currentIndex + 1} / {images.length}
+                {hideAnnotated && (
+                  <Chip 
+                    label="viewing unannotated only" 
+                    size="small" 
+                    sx={{ ml: 1, backgroundColor: '#e3f2fd', color: '#1976d2' }}
+                  />
+                )}
+              </Typography>
+            </Box>
             
-            {/* Progress Bar - Annotated vs Total */}
-            <div style={{
-              width: '100%',
-              height: '8px',
-              background: '#e0e0e0',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              marginBottom: '8px'
-            }}>
-              <div style={{
-                width: `${images.length > 0 ? ((images.filter(img => img.is_annotated).length / images.length) * 100) : 0}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #52c41a 0%, #73d13d 100%)',
-                transition: 'width 0.3s ease'
-              }} />
-            </div>
+            {/* Progress Bar */}
+            <LinearProgress 
+              variant="determinate" 
+              value={parseFloat(completionRate)}
+              sx={{ 
+                height: 8, 
+                borderRadius: 4,
+                mb: 2,
+                backgroundColor: '#e0e0e0',
+                '& .MuiLinearProgress-bar': {
+                  background: 'linear-gradient(90deg, #4caf50 0%, #8bc34a 100%)',
+                }
+              }}
+            />
             
             {/* Detailed Statistics */}
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span>Total Images:</span>
-                <strong>{images.length}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span>Annotated:</span>
-                <strong style={{ color: '#52c41a' }}>{images.filter(img => img.is_annotated).length}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span>Remaining:</span>
-                <strong style={{ color: '#faad14' }}>{images.filter(img => !img.is_annotated).length}</strong>
-              </div>
+            <Stack spacing={1}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption">Total Images:</Typography>
+                <Typography variant="caption" fontWeight="bold">{images.length}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption">Annotated:</Typography>
+                <Typography variant="caption" fontWeight="bold" color="success.main">
+                  {annotatedCount}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption">Remaining:</Typography>
+                <Typography variant="caption" fontWeight="bold" color="warning.main">
+                  {images.length - annotatedCount}
+                </Typography>
+              </Box>
               {hideAnnotated && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid #d9d9d9' }}>
-                  <span>Completion Rate:</span>
-                  <strong style={{ color: '#1890ff' }}>
-                    {images.length > 0 ? ((images.filter(img => img.is_annotated).length / images.length) * 100).toFixed(1) : 0}%
-                  </strong>
-                </div>
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  pt: 1, 
+                  borderTop: '1px solid #ddd'
+                }}>
+                  <Typography variant="caption">Completion Rate:</Typography>
+                  <Typography variant="caption" fontWeight="bold" color="primary">
+                    {completionRate}%
+                  </Typography>
+                </Box>
               )}
-            </div>
-          </div>
-        </div>
+            </Stack>
+          </Box>
+        </Box>
 
-        <div>
-          <h4>Score Annotation</h4>
-          <Space orientation="vertical" style={{ width: '100%' }}>
-            <InputNumber
-              ref={inputRef}
-              value={score}
-              onChange={setScore}
+        {/* Score Input */}
+        <Box>
+          <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+            Score Annotation
+          </Typography>
+          <Stack spacing={2}>
+            <TextField
+              inputRef={inputRef}
+              type="number"
+              value={score || ''}
+              onChange={(e) => setScore(e.target.value === '' ? null : Number(e.target.value))}
               onKeyDown={handleInputKeyDown}
-              min={config.min_score}
-              max={config.max_score}
-              step={config.score_step}
-              style={{ width: '100%' }}
+              inputProps={{
+                min: config.min_score,
+                max: config.max_score,
+                step: config.score_step,
+              }}
+              fullWidth
               size="large"
+              variant="outlined"
             />
-            <Button type="primary" onClick={handleSubmit} block size="large">
+            <Button 
+              variant="contained" 
+              onClick={handleSubmit} 
+              fullWidth 
+              size="large"
+              sx={{ py: 1.5 }}
+            >
               Submit (Enter)
             </Button>
-          </Space>
-        </div>
+          </Stack>
+        </Box>
 
-        <Space>
-          <Button icon={<LeftOutlined />} onClick={handlePrevious}>
+        {/* Navigation Buttons */}
+        <Stack direction="row" spacing={1}>
+          <Button 
+            startIcon={<PreviousIcon />} 
+            onClick={handlePrevious}
+            variant="outlined"
+          >
             Previous (↑)
           </Button>
-          <Button icon={<RightOutlined />} onClick={handleNext}>
+          <Button 
+            endIcon={<NextIcon />} 
+            onClick={handleNext}
+            variant="outlined"
+          >
             Next (↓)
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
-            Refresh Image
+          <Button 
+            startIcon={<RefreshIcon />} 
+            onClick={handleRefresh}
+            variant="outlined"
+          >
+            Refresh
           </Button>
-        </Space>
+        </Stack>
 
-        <div>
-          <h4>Settings</h4>
-          <Space orientation="vertical" style={{ width: '100%' }}>
-            <div>
-              <span>Sort by: </span>
+        {/* Settings */}
+        <Box>
+          <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+            Settings
+          </Typography>
+          <Stack spacing={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Sort by</InputLabel>
               <Select
                 value={sortBy}
-                onChange={setSortBy}
-                style={{ width: 120 }}
-                size="small"
+                label="Sort by"
+                onChange={(e) => setSortBy(e.target.value)}
               >
-                <Select.Option value="file_name">File Name</Select.Option>
-                <Select.Option value="random">Random</Select.Option>
+                <MenuItem value="file_name">File Name</MenuItem>
+                <MenuItem value="random">Random</MenuItem>
               </Select>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>Hide annotated:</span>
-              <Switch 
-                checked={hideAnnotated} 
-                onChange={setHideAnnotated}
-                size="small"
-              />
-            </div>
-          </Space>
-        </div>
+            </FormControl>
+            <FormControlLabel
+              control={
+                <Switch 
+                  checked={hideAnnotated} 
+                  onChange={(e) => setHideAnnotated(e.target.checked)}
+                />
+              }
+              label="Hide annotated images"
+            />
+          </Stack>
+        </Box>
 
-        <div style={{ marginTop: 'auto' }}>
-          <Button onClick={onBack} block>
+        {/* Back Button */}
+        <Box sx={{ mt: 'auto' }}>
+          <Button onClick={onBack} fullWidth variant="outlined">
             Back to Image List
           </Button>
-        </div>
-      </div>
-    </div>
+        </Box>
+      </Paper>
+
+      {/* Toast Notification */}
+      <Toast 
+        open={toastOpen} 
+        message={toastMessage} 
+        severity={toastSeverity} 
+        onClose={hideToast} 
+      />
+    </Box>
   );
 }
 
