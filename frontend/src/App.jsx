@@ -1,5 +1,30 @@
 import { useState, useEffect } from 'react';
-import { Layout, Menu, Button, Space, Badge } from 'antd';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Box,
+  Container,
+  Chip,
+  IconButton,
+  Button,
+  Badge,
+} from '@mui/material';
+import {
+  Menu as MenuIcon,
+  Clear as ClearIcon,
+  Dataset as DatasetIcon,
+  Settings as SettingsIcon,
+  Image as ImageIcon,
+  Edit as EditIcon,
+  Analytics as AnalyticsIcon,
+  MergeType as MergeIcon,
+} from '@mui/icons-material';
 import DatasetList from './components/DatasetList';
 import ImageList from './components/ImageList';
 import AnnotationView from './components/AnnotationView';
@@ -7,9 +32,8 @@ import InferenceResultViewer from './components/InferenceResultViewer';
 import ResultMerger from './components/ResultMerger';
 import DatasetConfigEditor from './components/DatasetConfigEditor';
 import imageCacheManager from './utils/imageCacheManager';
-import 'antd/dist/reset.css';
 
-const { Header, Sider, Content } = Layout;
+const drawerWidth = 240;
 
 function App() {
   const [currentView, setCurrentView] = useState('dataset');
@@ -91,45 +115,106 @@ function App() {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider width={200} theme="dark">
-        <div style={{ padding: '16px', color: 'white', fontSize: '18px', fontWeight: 'bold' }}>
-          Image Label Tool
-        </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={[currentView]}
-          items={[
-            { key: 'dataset', label: 'Dataset List' },
-            { key: 'config', label: 'Dataset Config', disabled: !currentDataset },
-            { key: 'images', label: 'Image List', disabled: !currentDataset },
-            { key: 'annotate', label: 'Annotating View', disabled: !currentDataset },
-            { key: 'inference', label: 'Inference Results', disabled: !currentDataset },
-            { key: 'merge', label: 'Merge Results', disabled: !currentDataset },
-          ]}
-          onClick={({ key }) => setCurrentView(key)}
-        />
-      </Sider>
-      <Layout>
-        <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '16px' }}>
-            {currentDataset ? `Dataset: ${currentDataset}` : 'No Dataset Selected'}
-          </span>
-          <Space>
-            <Badge count={cacheStats.loading} showZero color="blue" style={{ backgroundColor: '#1890ff' }}>
-              <span style={{ marginRight: 8 }}>Cache: {cacheStats.size}/{cacheStats.maxSize}</span>
-            </Badge>
-            <Button size="small" onClick={handleClearCache}>
-              Clear Cache
-            </Button>
-          </Space>
-        </Header>
-        <Content style={{ margin: '16px', padding: '16px', background: '#fff', minHeight: 'calc(100vh - 112px)' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      {/* App Bar */}
+      <AppBar
+        position="fixed"
+        sx={{
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
+      >
+        <Toolbar>
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
+            Image Label Tool
+          </Typography>
+          {currentDataset && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Chip
+                label={`Cache: ${cacheStats.size}/${cacheStats.maxSize}`}
+                size="small"
+                sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+              />
+              <Badge badgeContent={cacheStats.loading} color="secondary">
+                <IconButton size="small" onClick={handleClearCache} sx={{ color: 'white' }}>
+                  <ClearIcon />
+                </IconButton>
+              </Badge>
+            </Box>
+          )}
+        </Toolbar>
+      </AppBar>
+
+      {/* Drawer */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          [`& .MuiDrawer-paper`]: {
+            width: drawerWidth,
+            boxSizing: 'border-box',
+            backgroundColor: '#1a1a2e',
+            color: 'white',
+          },
+        }}
+      >
+        <Toolbar />
+        <Box sx={{ overflow: 'auto', pt: 2 }}>
+          <List>
+            {[
+              { key: 'dataset', label: 'Dataset List', icon: <DatasetIcon /> },
+              { key: 'config', label: 'Dataset Config', icon: <SettingsIcon />, disabled: !currentDataset },
+              { key: 'images', label: 'Image List', icon: <ImageIcon />, disabled: !currentDataset },
+              { key: 'annotate', label: 'Annotating View', icon: <EditIcon />, disabled: !currentDataset },
+              { key: 'inference', label: 'Inference Results', icon: <AnalyticsIcon />, disabled: !currentDataset },
+              { key: 'merge', label: 'Merge Results', icon: <MergeIcon />, disabled: !currentDataset },
+            ].map((item) => (
+              <ListItem key={item.key} disablePadding>
+                <ListItemButton
+                  selected={currentView === item.key}
+                  disabled={item.disabled}
+                  onClick={() => setCurrentView(item.key)}
+                  sx={{
+                    '&.Mui-selected': {
+                      backgroundColor: 'rgba(102, 126, 234, 0.3)',
+                      '&:hover': {
+                        backgroundColor: 'rgba(102, 126, 234, 0.5)',
+                      },
+                    },
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    },
+                  }}
+                >
+                  <Box sx={{ mr: 2, color: currentView === item.key ? '#667eea' : 'inherit' }}>
+                    {item.icon}
+                  </Box>
+                  <ListItemText
+                    primary={item.label}
+                    primaryTypographyProps={{
+                      fontWeight: currentView === item.key ? 'bold' : 'normal',
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
+
+      {/* Main Content */}
+      <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8, backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
+        <Container maxWidth="xl">
+          {currentDataset && (
+            <Typography variant="subtitle1" sx={{ mb: 2, color: '#666' }}>
+              Dataset: <strong>{currentDataset}</strong>
+            </Typography>
+          )}
           {renderContent()}
-        </Content>
-      </Layout>
-    </Layout>
+        </Container>
+      </Box>
+    </Box>
   );
 }
 
