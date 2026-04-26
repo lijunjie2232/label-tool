@@ -418,14 +418,14 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
   const completionRate = images.length > 0 ? ((annotatedCount / images.length) * 100).toFixed(1) : 0;
 
   return (
-    <Box sx={{ display: 'flex', gap: 3, height: 'calc(100vh - 200px)' }}>
+    <Box sx={{ display: 'flex', gap: 3, height: 'calc(100vh - 140px)' }}>
       {/* Left side - Image Viewer */}
-      <Paper sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+      <Paper sx={{ flex: 1, overflow: 'hidden', p: 2 }}>
         <ImageViewer imageUrl={imageUrl} />
       </Paper>
 
       {/* Right side - Control Panel */}
-      <Paper sx={{ width: 380, p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Paper sx={{ width: 380, p: 3, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'auto' }}>
         {/* Current Image Info */}
         <Box>
           <Typography variant="h6" gutterBottom>Current Image</Typography>
@@ -508,21 +508,53 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
             Score Annotation
           </Typography>
           <Stack spacing={2}>
-            <TextField
-              inputRef={inputRef}
-              type="number"
-              value={score || ''}
-              onChange={(e) => setScore(e.target.value === '' ? null : Number(e.target.value))}
-              onKeyDown={handleInputKeyDown}
-              inputProps={{
-                min: config.min_score,
-                max: config.max_score,
-                step: config.score_step,
-              }}
-              fullWidth
-              size="large"
-              variant="outlined"
-            />
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Button 
+                variant="outlined"
+                onClick={() => {
+                  const newScore = Math.max((score || config.min_score) - config.score_step, config.min_score);
+                  setScore(newScore);
+                }}
+                sx={{ minWidth: 48 }}
+              >
+                -
+              </Button>
+              <TextField
+                inputRef={inputRef}
+                type="number"
+                value={score ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setScore(null);
+                  } else {
+                    const numVal = Number(val);
+                    // Round to nearest step
+                    const rounded = Math.round(numVal / config.score_step) * config.score_step;
+                    setScore(Math.max(config.min_score, Math.min(config.max_score, rounded)));
+                  }
+                }}
+                onKeyDown={handleInputKeyDown}
+                inputProps={{
+                  min: config.min_score,
+                  max: config.max_score,
+                  step: config.score_step,
+                }}
+                fullWidth
+                size="large"
+                variant="outlined"
+              />
+              <Button 
+                variant="outlined"
+                onClick={() => {
+                  const newScore = Math.min((score || config.min_score) + config.score_step, config.max_score);
+                  setScore(newScore);
+                }}
+                sx={{ minWidth: 48 }}
+              >
+                +
+              </Button>
+            </Box>
             <Button 
               variant="contained" 
               onClick={handleSubmit} 
