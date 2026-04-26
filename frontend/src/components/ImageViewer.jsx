@@ -61,7 +61,7 @@ function ImageViewer({ imageUrl }) {
     <Box 
       sx={{ 
         width: '100%', 
-        height: 'calc(100vh - 280px)',
+        height: '100%',
         overflow: 'hidden',
         cursor: 'pointer',
         display: 'flex',

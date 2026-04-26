@@ -574,14 +574,14 @@ function AnnotationView({ dataset, config, initialImagePath, onBack }) {
             onClick={handlePrevious}
             variant="outlined"
           >
-            Previous (↑)
+            Previous
           </Button>
           <Button 
             endIcon={<NextIcon />} 
             onClick={handleNext}
             variant="outlined"
           >
-            Next (↓)
+            Next
           </Button>
           <Button 
             startIcon={<RefreshIcon />} 
