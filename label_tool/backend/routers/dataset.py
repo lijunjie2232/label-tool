@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from backend.models import DatasetConfig
-from backend.services import dataset_service
+from label_tool.backend.models import DatasetConfig
+from label_tool.backend.services import dataset_service
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
