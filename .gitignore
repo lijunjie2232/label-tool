@@ -84,3 +84,4 @@ htmlcov/
 venv/
 .venv/
 datasets.jsonl
+frontend_dist/
