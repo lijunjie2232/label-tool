@@ -397,7 +397,7 @@ wheels = [
 ]
 
 [[package]]
-name = "label-tool"
+name = "logist-labeling"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
