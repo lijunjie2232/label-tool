@@ -28,8 +28,8 @@ try:
     app.include_router(inference.router, prefix="/api")
 except ImportError:
     # Fallback for development mode
-    sys.path.insert(0, os.path.dirname(package_dir))
-    from backend.routers import dataset, images, annotations, inference
+    sys.path.insert(0, os.path.dirname(os.path.dirname(package_dir)))
+    from logist_labeling.backend.routers import dataset, images, annotations, inference
     app.include_router(dataset.router, prefix="/api")
     app.include_router(images.router, prefix="/api")
     app.include_router(annotations.router, prefix="/api")
