@@ -31,19 +31,65 @@
 - Node.js 24+
 - uv (Python包管理器)
 
-### 后端依赖安装
+### 从源码安装(开发模式)
+
+**后端依赖安装:**
 
 ```bash
 cd label-tool
 uv sync
 ```
 
-### 前端依赖安装
+**前端依赖安装:**
 
 ```bash
 cd frontend
 npm install
 ```
+
+### 从Wheel安装(生产模式)
+
+**构建Wheel:**
+
+```bash
+# 首先构建前端
+cd frontend
+npm run build
+cd ..
+
+# 然后构建Python wheel
+python -m pip install build --break-system-packages
+python -m build --wheel
+```
+
+生成的wheel文件位于 `dist/logist_labeling-0.1.0-py3-none-any.whl`
+
+**安装Wheel:**
+
+```bash
+python -m pip install dist/logist_labeling-0.1.0-py3-none-any.whl --break-system-packages
+```
+
+**运行应用:**
+
+```bash
+# 使用CLI命令(推荐)
+logist-labeling start
+
+# 自定义主机和端口
+logist-labeling start --host 0.0.0.0 --port 9000
+
+# 开发模式(自动重载)
+logist-labeling start --reload
+
+# 或者使用Python模块
+python -m logist_labeling
+
+# 或者使用uvicorn
+uvicorn logist_labeling.__main__:app --host 0.0.0.0 --port 8000
+```
+
+访问 http://localhost:8000 使用应用。
 
 ## 启动应用
 
@@ -185,20 +231,24 @@ path/to/image2.png,3.2
 
 ```
 label-tool/
-├── backend/                 # FastAPI后端
-│   ├── main.py             # 应用入口
-│   ├── models.py           # Pydantic数据模型
-│   ├── routers/            # API路由
-│   ├── services/           # 业务逻辑层
-│   └── utils/              # 工具函数
-├── frontend/               # React前端
+├── logist_labeling/              # Python包
+│   ├── __init__.py         # 包初始化
+│   ├── __main__.py         # 应用入口点
+│   ├── backend/            # FastAPI后端
+│   │   ├── models.py       # Pydantic数据模型
+│   │   ├── routers/        # API路由
+│   │   ├── services/       # 业务逻辑层
+│   │   └── utils/          # 工具函数
+│   └── frontend_dist/      # 前端构建产物(生产模式)
+├── frontend/               # React前端源码
 │   ├── src/
 │   │   ├── components/     # React组件
 │   │   ├── services/       # API调用
 │   │   └── App.jsx         # 主应用
 │   └── package.json
 ├── configs/                # 数据集配置存储(自动生成)
-├── pyproject.toml          # Python依赖
+├── pyproject.toml          # Python依赖和打包配置
+├── MANIFEST.in             # 打包文件清单
 └── start_dev.sh            # 开发启动脚本
 ```
 
