@@ -24,7 +24,7 @@ def get_image_list(request: ImageListRequest):
         root_path = request.root_path
         
         # 加载配置
-        from backend.services.dataset_service import get_dataset_config
+        from logist_labeling.backend.services.dataset_service import get_dataset_config
         config = get_dataset_config(root_path)
         if not config:
             raise HTTPException(status_code=404, detail="Dataset config not found")

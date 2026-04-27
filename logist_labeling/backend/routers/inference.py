@@ -22,7 +22,7 @@ def run_inference(request: InferenceRequest):
         root_path = request.root_path
         
         # 加载配置
-        from backend.services.dataset_service import get_dataset_config
+        from logist_labeling.backend.services.dataset_service import get_dataset_config
         config = get_dataset_config(root_path)
         if not config:
             raise HTTPException(status_code=404, detail="Dataset config not found")
@@ -128,7 +128,7 @@ def merge_inference(request: dict):
         df = pd.read_csv(filepath)
         
         # 添加到标注
-        from backend.services.annotation_service import add_annotation
+        from logist_labeling.backend.services.annotation_service import add_annotation
         count = 0
         for _, row in df.iterrows():
             image_path = str(row['image_path'])
